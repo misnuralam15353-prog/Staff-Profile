@@ -1,0 +1,13 @@
+{
+  "name": "RFL",
+  "description": "Employee profile management system for RFL.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "majorCapabilities": [
+    "Firebase Firestore",
+    "Tailwind CSS",
+    "Lucide Icons",
+    "Excel Export/Import"
+  ]
+}

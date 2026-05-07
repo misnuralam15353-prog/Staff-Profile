@@ -1,0 +1,49 @@
+{
+  "entities": {
+    "Employee": {
+      "title": "Employee",
+      "description": "Details of an RFL employee",
+      "type": "object",
+      "properties": {
+        "employeeId": { "type": "string", "description": "Staff ID for the employee" },
+        "name": { "type": "string", "description": "Full name of the employee" },
+        "designation": { "type": "string", "description": "Job title" },
+        "salary": { "type": "number", "description": "Monthly salary" },
+        "phone": { "type": "string", "description": "Phone number" },
+        "permanentAddress": { "type": "string", "description": "Permanent home address" },
+        "presentAddress": { "type": "string", "description": "Current residential address" },
+        "guardian1": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "relation": { "type": "string" },
+            "phone": { "type": "string" }
+          }
+        },
+        "guardian2": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "relation": { "type": "string" },
+            "phone": { "type": "string" }
+          }
+        },
+        "joiningDate": { "type": "string", "format": "date" },
+        "leaveStartDate": { "type": "string", "format": "date" },
+        "leaveEndDate": { "type": "string", "format": "date" },
+        "nid": { "type": "string", "description": "National ID number" },
+        "photoUrl": { "type": "string", "description": "URL to employee photo" },
+        "status": { "type": "string", "enum": ["active", "resigned", "on-leave"] },
+        "createdAt": { "type": "number" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["employeeId", "name", "designation", "phone", "joiningDate", "nid", "status"]
+    }
+  },
+  "firestore": {
+    "employees": {
+      "schema": "Employee",
+      "description": "Collection of all employees"
+    }
+  }
+}

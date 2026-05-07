@@ -1,0 +1,40 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidEmployee(data) {
+      return data.keys().hasAll(['employeeId', 'name', 'designation', 'salary', 'phone', 'permanentAddress', 'presentAddress', 'guardian1', 'guardian2', 'joiningDate', 'nid', 'photoUrl', 'status', 'createdAt', 'updatedAt'])
+        && data.employeeId is string && data.employeeId.size() <= 100
+        && data.name is string && data.name.size() <= 200
+        && data.designation is string && data.designation.size() <= 100
+        && data.salary is number
+        && data.phone is string && data.phone.size() <= 20
+        && data.permanentAddress is string && data.permanentAddress.size() <= 500
+        && data.presentAddress is string && data.presentAddress.size() <= 500
+        && data.joiningDate is string && data.joiningDate.size() <= 20
+        && data.nid is string && data.nid.size() <= 50
+        && data.photoUrl is string && data.photoUrl.size() <= 1000000
+        && data.status in ['active', 'resigned', 'on-leave']
+        && data.createdAt is number
+        && data.updatedAt is number;
+    }
+
+    match /employees/{employeeId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidEmployee(request.resource.data);
+      allow update: if isSignedIn() && isValidEmployee(request.resource.data);
+      allow delete: if isSignedIn();
+    }
+  }
+}
