@@ -469,6 +469,17 @@ export default function App() {
                     <p className="text-[10px] uppercase tracking-[0.2em] text-[#C5A059] font-bold">Analyzing {filteredEmployees.length} security profiles</p>
                   </div>
                   
+                  {/* Mobile searchable input shown on mobile screen width */}
+                  <div className="relative w-full sm:hidden">
+                    <Search className="absolute left-3 top-2.5 w-4 h-4 text-white/20" />
+                    <Input 
+                      placeholder="Scan Registry..." 
+                      className="pl-9 h-10 bg-white/5 border-white/10 rounded-none text-xs w-full focus-visible:ring-[#C5A059]"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                  
                   <div className="flex bg-white/5 p-1 border border-white/5">
                     {['all', 'active', 'on-leave', 'resigned'].map((status) => (
                       <button
