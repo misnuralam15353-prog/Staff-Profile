@@ -1,7 +1,6 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { auth } from './lib/firebase';
-import { onAuthStateChanged, signOut, User } from 'firebase/auth';
+import { supabase } from './lib/supabase';
 import { employeeService } from './services/employeeService';
 import { excelService } from './services/excelService';
 import { Employee } from './types';
@@ -29,8 +28,34 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Toaster, toast } from 'sonner';
 import { TooltipProvider } from './components/ui/tooltip';
 
+interface AppUser {
+  id: string;
+  email: string;
+  displayName: string;
+  photoURL: string;
+}
+
+const mapSupabaseUser = (sbUser: any): AppUser | null => {
+  if (!sbUser) return null;
+  const metadata = sbUser.user_metadata || {};
+  const displayName = metadata.full_name || sbUser.email?.split('@')[0] || 'Administrator';
+  return {
+    id: sbUser.id,
+    email: sbUser.email || '',
+    displayName: displayName,
+    photoURL: metadata.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${displayName}`,
+  };
+};
+
 export default function App() {
-  const [user, setUser] = useState<User | null>(null);
+  const [user, setUser] = useState<AppUser | null>(() => {
+    try {
+      const saved = localStorage.getItem('rfl_active_user');
+      return saved ? JSON.parse(saved) : null;
+    } catch {
+      return null;
+    }
+  });
   const [loading, setLoading] = useState(true);
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -42,11 +67,33 @@ export default function App() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
+    // Check initial active session from Supabase
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user) {
+        const mapped = mapSupabaseUser(session.user);
+        setUser(mapped);
+        if (mapped) {
+          localStorage.setItem('rfl_active_user', JSON.stringify(mapped));
+        }
+      }
+      setLoading(false);
+    }).catch(() => {
       setLoading(false);
     });
-    return () => unsubscribe();
+
+    // Handle authentication listener events
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (session?.user) {
+        const mapped = mapSupabaseUser(session.user);
+        setUser(mapped);
+        if (mapped) {
+          localStorage.setItem('rfl_active_user', JSON.stringify(mapped));
+        }
+      }
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
   }, []);
 
   useEffect(() => {
@@ -60,9 +107,14 @@ export default function App() {
 
   const handleSignOut = async () => {
     try {
-      await signOut(auth);
+      localStorage.removeItem('rfl_active_user');
+      setUser(null);
+      await supabase.auth.signOut();
+      toast.success('Successfully disconnected session');
     } catch (error) {
-      toast.error('Failed to sign out');
+      localStorage.removeItem('rfl_active_user');
+      setUser(null);
+      toast.success('Session disconnected');
     }
   };
 
@@ -167,7 +219,7 @@ export default function App() {
   if (!user) {
     return (
       <>
-        <Login />
+        <Login onLoginSuccess={(loggedUser) => setUser(loggedUser)} />
         <Toaster position="top-center" theme="dark" />
       </>
     );

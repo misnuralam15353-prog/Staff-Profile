@@ -3,11 +3,49 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Google AI Studio App</title>
+    <title>RFL Employee Registry</title>
+    <script>
+      // Safeguard against packages attempting assignment to read-only fetch in iframe environments
+      (function() {
+        try {
+          if (typeof window !== 'undefined') {
+            var originalFetch = window.fetch ? window.fetch.bind(window) : undefined;
+            if (originalFetch) {
+              var activeFetch = originalFetch;
+              try {
+                Object.defineProperty(window, 'fetch', {
+                  get: function() {
+                    return activeFetch;
+                  },
+                  set: function(fn) {
+                    activeFetch = typeof fn === 'function' ? fn : activeFetch;
+                  },
+                  configurable: true,
+                  enumerable: true
+                });
+              } catch (e) {
+                // If defineProperty fails on window, try on globalThis
+                try {
+                  if (typeof globalThis !== 'undefined' && globalThis !== window) {
+                    Object.defineProperty(globalThis, 'fetch', {
+                      get: function() { return activeFetch; },
+                      set: function(fn) { activeFetch = typeof fn === 'function' ? fn : activeFetch; },
+                      configurable: true,
+                      enumerable: true
+                    });
+                  }
+                } catch (e2) {}
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('Fetch setter safeguard applied', err);
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
-
