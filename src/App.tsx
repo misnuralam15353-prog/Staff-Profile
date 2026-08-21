@@ -4,15 +4,14 @@ import { supabase } from './lib/supabase';
 import { employeeService } from './services/employeeService';
 import { excelService } from './services/excelService';
 import { Employee } from './types';
-import { Login } from './components/Login';
 import { EmployeeTable } from './components/EmployeeTable';
 import { EmployeeForm } from './components/EmployeeForm';
 import { EmployeeDetail } from './components/EmployeeDetail';
+import { GoogleDriveManager } from './components/GoogleDriveManager';
 import { Button } from './components/ui/button';
 import { Input } from './components/ui/input';
 import { 
   Plus, 
-  LogOut, 
   Search, 
   Users, 
   LayoutDashboard, 
@@ -22,7 +21,12 @@ import {
   X,
   Download,
   Upload,
-  FileSpreadsheet
+  FileSpreadsheet,
+  HardDrive,
+  Trash2,
+  AlertTriangle,
+  RotateCcw,
+  CheckCircle2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Toaster, toast } from 'sonner';
@@ -35,150 +39,88 @@ interface AppUser {
   photoURL: string;
 }
 
-const mapSupabaseUser = (sbUser: any): AppUser | null => {
-  if (!sbUser) return null;
-  const metadata = sbUser.user_metadata || {};
-  const displayName = metadata.full_name || sbUser.email?.split('@')[0] || 'Administrator';
-  return {
-    id: sbUser.id,
-    email: sbUser.email || '',
-    displayName: displayName,
-    photoURL: metadata.avatar_url || `https://api.dicebear.com/7.x/initials/svg?seed=${displayName}`,
-  };
+const DEFAULT_USER: AppUser = {
+  id: 'rfl-admin',
+  email: 'admin@rflgroupbd.com',
+  displayName: 'RFL Registry',
+  photoURL: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
 };
 
 export default function App() {
-  const [user, setUser] = useState<AppUser | null>(() => {
-    try {
-      const saved = localStorage.getItem('rfl_active_user');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
-  });
-  const [loading, setLoading] = useState(true);
-  const [employees, setEmployees] = useState<Employee[]>([]);
+  // Direct open without login screen
+  const [user] = useState<AppUser>(DEFAULT_USER);
+  const [employees, setEmployees] = useState<Employee[]>(() => employeeService.getAll());
   const [searchTerm, setSearchTerm] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Employee | null>(null);
   const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
+  const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'REGISTRY' | 'ALERTS' | 'TERMINAL'>('DASHBOARD');
+  const [activeTab, setActiveTab] = useState<'DASHBOARD' | 'REGISTRY' | 'DRIVE' | 'ALERTS' | 'TERMINAL'>('DASHBOARD');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
   useEffect(() => {
-    // Check initial active session from Supabase
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session?.user) {
-        const mapped = mapSupabaseUser(session.user);
-        setUser(mapped);
-        if (mapped) {
-          localStorage.setItem('rfl_active_user', JSON.stringify(mapped));
-        }
-      }
-      setLoading(false);
-    }).catch(() => {
-      setLoading(false);
+    // Subscribe to employee data updates
+    const unsubscribe = employeeService.subscribeToEmployees((data) => {
+      setEmployees(data);
     });
-
-    // Handle authentication listener events
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      if (session?.user) {
-        const mapped = mapSupabaseUser(session.user);
-        setUser(mapped);
-        if (mapped) {
-          localStorage.setItem('rfl_active_user', JSON.stringify(mapped));
-        }
-      }
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    return () => unsubscribe();
   }, []);
 
-  useEffect(() => {
-    if (user) {
-      const unsubscribe = employeeService.subscribeToEmployees((data) => {
-        setEmployees(data);
-      });
-      return () => unsubscribe();
-    }
-  }, [user]);
-
-  const handleSignOut = async () => {
-    try {
-      localStorage.removeItem('rfl_active_user');
-      setUser(null);
-      await supabase.auth.signOut();
-      toast.success('Successfully disconnected session');
-    } catch (error) {
-      localStorage.removeItem('rfl_active_user');
-      setUser(null);
-      toast.success('Session disconnected');
-    }
-  };
-
   const handleAddEmployee = async (data: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>) => {
-    console.log('Adding employee:', data);
     try {
       await employeeService.addEmployee(data);
       setShowForm(false);
-      toast.success('Employee registered successfully');
+      toast.success('Employee registered successfully into Registry');
     } catch (error) {
       console.error('Registration Error:', error);
-      const message = error instanceof Error ? error.message : 'Unknown error';
-      try {
-        const errorDetail = JSON.parse(message);
-        toast.error(`Registration failed: ${errorDetail.error || 'Check required fields'}`);
-      } catch {
-        toast.error(`Failed to register employee: ${message}`);
-      }
+      toast.error('Failed to register employee');
     }
   };
 
   const handleUpdateEmployee = async (data: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>) => {
-    console.log('Updating employee:', editingEmployee?.id, data);
     if (editingEmployee?.id) {
       try {
         await employeeService.updateEmployee(editingEmployee.id, data);
         setEditingEmployee(null);
         setShowForm(false);
-        toast.success('Record updated successfully');
+        toast.success(`Record for "${data.name}" updated successfully`);
       } catch (error) {
         console.error('Update Error:', error);
-        const message = error instanceof Error ? error.message : 'Unknown error';
-        try {
-          const errorDetail = JSON.parse(message);
-          toast.error(`Update failed: ${errorDetail.error || 'Permission denied'}`);
-        } catch {
-          toast.error(`Failed to update record: ${message}`);
-        }
+        toast.error('Failed to update record');
       }
     }
   };
 
-  const handleDeleteEmployee = async (id: string) => {
-    if (window.confirm('Are you sure you want to delete this record? This action is irreversible.')) {
-      try {
-        await employeeService.deleteEmployee(id);
-        toast.success('Record deleted');
-      } catch (error) {
-        toast.error('Failed to delete record');
-      }
+  const handleConfirmDelete = async () => {
+    if (!employeeToDelete?.id) return;
+    const target = employeeToDelete;
+    setIsDeleting(true);
+    try {
+      await employeeService.deleteEmployee(target.id);
+      setEmployeeToDelete(null);
+      toast.success(`"${target.name}" removed from registry`);
+    } catch (error) {
+      console.error('Delete error:', error);
+      toast.error('Failed to delete employee record');
+    } finally {
+      setIsDeleting(false);
     }
   };
 
   const handleExport = async () => {
     try {
-      if (filteredEmployees.length === 0) {
-        toast.error('No records found to export');
+      const dataToExport = filteredEmployees.length > 0 ? filteredEmployees : employees;
+      if (dataToExport.length === 0) {
+        toast.error('No employee records to export');
         return;
       }
-      await excelService.exportToExcel(filteredEmployees);
-      toast.success(`Exported ${filteredEmployees.length} records to Excel`);
+      await excelService.exportToExcel(dataToExport);
+      toast.success(`Exported ${dataToExport.length} records to Excel`);
     } catch (error) {
       console.error('Export Failed:', error);
-      toast.error('Failed to export data. Please try again.');
+      toast.error('Failed to export data');
     }
   };
 
@@ -192,38 +134,30 @@ export default function App() {
         }
         toast.success(`Imported ${importedData.length} records successfully`);
       } catch (error) {
-        toast.error('Failed to import Excel data. Ensure the format is correct.');
+        toast.error('Failed to import Excel data. Ensure the format is valid.');
       }
+      // Reset input value
+      e.target.value = '';
     }
+  };
+
+  const handleResetSampleData = () => {
+    employeeService.resetToInitialRecords();
+    toast.success('Registry initialized with sample data');
   };
 
   const filteredEmployees = employees.filter(emp => {
     const matchesSearch = 
       emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       emp.employeeId.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      emp.designation.toLowerCase().includes(searchTerm.toLowerCase());
+      emp.designation.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      emp.phone.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      emp.nid.toLowerCase().includes(searchTerm.toLowerCase());
     
     const matchesStatus = statusFilter === 'all' || emp.status === statusFilter;
     
     return matchesSearch && matchesStatus;
   });
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0A0A0B]">
-        <div className="w-12 h-12 border-4 border-[#C5A059] border-t-transparent rounded-none animate-spin"></div>
-      </div>
-    );
-  }
-
-  if (!user) {
-    return (
-      <>
-        <Login onLoginSuccess={(loggedUser) => setUser(loggedUser)} />
-        <Toaster position="top-center" theme="dark" />
-      </>
-    );
-  }
 
   return (
     <TooltipProvider>
@@ -232,7 +166,7 @@ export default function App() {
       
       {/* Sidebar - Desktop */}
       <aside className="hidden lg:flex w-72 bg-[#111112] border-r border-white/5 flex-col sticky top-0 h-screen">
-        <div className="p-8">
+        <div className="p-8 flex-1 flex flex-col">
           <div className="flex flex-col mb-10">
             <div className="text-[#C5A059] font-serif italic text-3xl tracking-tight mb-1 font-bold">RFL</div>
             <div className="text-[10px] uppercase tracking-[0.2em] text-white/40">Employee Registry</div>
@@ -255,8 +189,21 @@ export default function App() {
               icon={<Users />} 
               label="REGISTRY" 
               active={activeTab === 'REGISTRY'} 
+              badge={employees.length.toString()}
               onClick={() => { 
                 setActiveTab('REGISTRY'); 
+                setShowForm(false);
+                setEditingEmployee(null);
+                setSelectedEmployee(null);
+                setIsMobileMenuOpen(false); 
+              }}
+            />
+            <SidebarLink 
+              icon={<HardDrive />} 
+              label="GOOGLE DRIVE" 
+              active={activeTab === 'DRIVE'} 
+              onClick={() => { 
+                setActiveTab('DRIVE'); 
                 setShowForm(false);
                 setEditingEmployee(null);
                 setSelectedEmployee(null);
@@ -267,7 +214,7 @@ export default function App() {
               icon={<Bell />} 
               label="ALERTS" 
               active={activeTab === 'ALERTS'}
-              badge={employees.filter(e => e.status === 'on-leave').length.toString()} 
+              badge={employees.filter(e => e.status === 'on-leave' || e.status === 'resigned').length.toString()} 
               onClick={() => { 
                 setActiveTab('ALERTS'); 
                 setShowForm(false);
@@ -289,38 +236,14 @@ export default function App() {
               }}
             />
           </nav>
-
-          <div className="mt-12 space-y-3">
-             <div className="text-[9px] uppercase tracking-[0.2em] text-white/20 mb-4 font-bold">External Operations</div>
-             <Button 
-                onClick={handleExport}
-                className="w-full justify-start gap-3 bg-white/5 border border-white/10 rounded-none text-white/60 hover:text-white hover:bg-white/10 h-10 text-[10px] tracking-widest font-bold"
-             >
-                <Download className="w-3.5 h-3.5" /> EXPORT EXCEL
-             </Button>
-             <div className="relative">
-                <Button 
-                    className="w-full justify-start gap-3 bg-white/5 border border-white/10 rounded-none text-white/60 hover:text-white hover:bg-white/10 h-10 text-[10px] tracking-widest font-bold"
-                >
-                    <Upload className="w-3.5 h-3.5" /> IMPORT EXCEL
-                </Button>
-                <input type="file" accept=".xlsx, .xls" onChange={handleImport} className="absolute inset-0 opacity-0 cursor-pointer" />
-             </div>
-             <Button 
-                onClick={() => excelService.downloadSample()}
-                variant="ghost"
-                className="w-full justify-start gap-3 text-white/20 hover:text-white/40 h-8 text-[9px] tracking-widest font-bold px-0"
-             >
-                <FileSpreadsheet className="w-3 h-3" /> DOWNLOAD TEMPLATE
-             </Button>
-          </div>
         </div>
         
-        <div className="mt-auto p-8 border-t border-white/5">
-          <div className="flex items-center gap-3 mb-6 p-3 rounded-none bg-white/5 border border-white/5 overflow-hidden">
+        {/* Sidebar Footer Profile */}
+        <div className="p-8 border-t border-white/5">
+          <div className="flex items-center gap-3 p-3 rounded-none bg-white/5 border border-white/5 overflow-hidden">
             <img 
-              src={user.photoURL || `https://api.dicebear.com/7.x/initials/svg?seed=${user.displayName}`} 
-              className="w-10 h-10 rounded-none transition-all" 
+              src={user.photoURL} 
+              className="w-10 h-10 rounded-none transition-all object-cover" 
               alt="Profile" 
             />
             <div className="overflow-hidden">
@@ -328,20 +251,13 @@ export default function App() {
               <p className="text-[10px] text-white/30 truncate uppercase tracking-tighter">{user.email}</p>
             </div>
           </div>
-          <Button 
-            variant="ghost" 
-            className="w-full justify-start gap-2 text-white/40 hover:text-white/80 hover:bg-white/5 py-4 border border-white/5 rounded-none text-[10px] tracking-[0.2em] font-bold"
-            onClick={handleSignOut}
-          >
-            <LogOut className="w-4 h-4" /> DISCONNECT
-          </Button>
         </div>
       </aside>
 
-      {/* Main Content */}
+      {/* Main Content Area */}
       <main className="flex-1 flex flex-col min-w-0">
         {/* Top Header */}
-        <header className="h-20 bg-[#0A0A0B] border-b border-white/5 flex items-center justify-between px-10 sticky top-0 z-30">
+        <header className="h-20 bg-[#0A0A0B] border-b border-white/5 flex items-center justify-between px-6 md:px-10 sticky top-0 z-30">
           <div className="flex items-center gap-4 lg:hidden">
             <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(true)}>
               <Menu className="w-6 h-6 text-white/60" />
@@ -349,35 +265,20 @@ export default function App() {
             <div className="text-[#C5A059] font-serif italic text-xl font-bold">RFL</div>
           </div>
 
+          <div className="hidden lg:flex items-center gap-3">
+            <span className="text-xs uppercase tracking-widest text-white/40 font-bold">Current Node:</span>
+            <span className="text-xs text-[#C5A059] font-mono font-bold tracking-wider">{activeTab}</span>
+          </div>
 
-
-          <div className="flex items-center gap-4">
-            <div className="relative mr-4 hidden sm:block">
-              <Search className="absolute left-3 top-2.5 w-4 h-4 text-white/20" />
-              <Input 
-                placeholder="Scan Registry..." 
-                className="pl-9 h-10 bg-white/5 border-white/10 rounded-none text-xs w-64 focus-visible:ring-[#C5A059]"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-              />
-            </div>
-            
-            {!showForm && !editingEmployee && !selectedEmployee && (
+          <div className="flex items-center gap-3">
+            {!showForm && !editingEmployee && !selectedEmployee && activeTab === 'REGISTRY' && (
               <Button 
-                onClick={handleExport}
-                variant="outline"
-                className="flex border-white/10 bg-white/[0.02] hover:bg-white/5 text-white/60 hover:text-white rounded-none h-10 px-4 md:px-6 gap-2 text-[10px] uppercase tracking-widest font-bold font-sans"
+                onClick={() => setShowForm(true)}
+                className="bg-[#C5A059] hover:bg-[#B48F48] text-black rounded-none h-10 px-5 gap-2 text-[10px] uppercase tracking-widest font-bold font-sans shadow-lg shadow-[#C5A059]/10"
               >
-                <Download className="w-4 h-4" /> <span className="hidden sm:inline">Export Data</span>
+                <Plus className="w-4 h-4" /> Initialize Register
               </Button>
             )}
-
-            <Button 
-              onClick={() => setShowForm(true)}
-              className="bg-[#C5A059] hover:bg-[#B48F48] text-black rounded-none h-10 px-6 gap-2 text-[10px] uppercase tracking-widest font-bold font-sans shadow-lg shadow-[#C5A059]/10"
-            >
-              <Plus className="w-4 h-4" /> Initialize Registry
-            </Button>
           </div>
         </header>
 
@@ -397,6 +298,113 @@ export default function App() {
                 employee={selectedEmployee} 
                 onClose={() => setSelectedEmployee(null)} 
               />
+            ) : activeTab === 'REGISTRY' ? (
+              <motion.div 
+                key="registry"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="space-y-6"
+              >
+                {/* Registry Tab Header & Primary Operations Panel */}
+                <div className="bg-white/[0.02] border border-white/5 p-6 md:p-8 space-y-6">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                      <h2 className="text-2xl md:text-3xl font-serif text-white tracking-tight font-bold">Staff Registry</h2>
+                      <p className="text-[10px] uppercase tracking-[0.2em] text-[#C5A059] font-bold mt-1">
+                        {employees.length} Personnel Records Registered
+                      </p>
+                    </div>
+
+                    {/* Integrated Operations: Initialize Register, Export, Import, Template */}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Button 
+                        onClick={() => setShowForm(true)}
+                        className="bg-[#C5A059] hover:bg-[#B48F48] text-black rounded-none h-9 px-4 gap-1.5 text-[10px] uppercase tracking-widest font-bold"
+                      >
+                        <Plus className="w-3.5 h-3.5" /> Initialize Register
+                      </Button>
+
+                      <Button 
+                        onClick={handleExport}
+                        variant="outline"
+                        className="bg-white/5 border-white/10 hover:bg-white/10 text-white rounded-none h-9 px-4 gap-1.5 text-[10px] uppercase tracking-widest font-bold"
+                      >
+                        <Download className="w-3.5 h-3.5 text-[#C5A059]" /> Export Excel
+                      </Button>
+
+                      <div className="relative">
+                        <Button 
+                          variant="outline"
+                          className="bg-white/5 border-white/10 hover:bg-white/10 text-white rounded-none h-9 px-4 gap-1.5 text-[10px] uppercase tracking-widest font-bold"
+                        >
+                          <Upload className="w-3.5 h-3.5 text-[#C5A059]" /> Import Excel
+                        </Button>
+                        <input 
+                          type="file" 
+                          accept=".xlsx, .xls" 
+                          onChange={handleImport} 
+                          className="absolute inset-0 opacity-0 cursor-pointer" 
+                        />
+                      </div>
+
+                      <Button 
+                        onClick={() => excelService.downloadSample()}
+                        variant="ghost"
+                        className="text-white/40 hover:text-white hover:bg-white/5 rounded-none h-9 px-3 gap-1.5 text-[10px] uppercase tracking-widest font-bold"
+                      >
+                        <FileSpreadsheet className="w-3.5 h-3.5" /> Template
+                      </Button>
+
+                      <Button
+                        onClick={handleResetSampleData}
+                        variant="ghost"
+                        title="Restore initial sample employee records"
+                        className="text-white/20 hover:text-white/60 hover:bg-white/5 rounded-none h-9 px-2 text-[10px] uppercase tracking-widest"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Filter & Search Bar inside Registry */}
+                  <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-white/5">
+                    <div className="relative w-full sm:w-80">
+                      <Search className="absolute left-3 top-2.5 w-4 h-4 text-white/30" />
+                      <Input 
+                        placeholder="Search by name, ID, phone, NID..." 
+                        className="pl-9 h-10 bg-white/5 border-white/10 rounded-none text-xs w-full focus-visible:ring-[#C5A059]"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                    </div>
+
+                    <div className="flex bg-white/5 p-1 border border-white/5 w-full sm:w-auto overflow-x-auto">
+                      {['all', 'active', 'on-leave', 'resigned'].map((status) => (
+                        <button
+                          key={status}
+                          onClick={() => setStatusFilter(status)}
+                          className={`px-4 py-1.5 text-[9px] font-bold uppercase tracking-widest whitespace-nowrap transition-all ${
+                            statusFilter === status 
+                            ? 'bg-[#C5A059] text-black shadow-lg shadow-[#C5A059]/20' 
+                            : 'text-white/40 hover:text-white/60'
+                          }`}
+                        >
+                          {status.replace('-', ' ')}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Table View */}
+                <EmployeeTable 
+                  employees={filteredEmployees}
+                  onEdit={(emp) => setEditingEmployee(emp)}
+                  onDelete={(emp) => setEmployeeToDelete(emp)}
+                  onView={(emp) => setSelectedEmployee(emp)}
+                />
+              </motion.div>
             ) : activeTab === 'DASHBOARD' ? (
               <motion.div 
                 key="dashboard"
@@ -405,57 +413,164 @@ export default function App() {
                 exit={{ opacity: 0, y: -10 }}
                 className="space-y-8"
               >
+                {/* Header Welcome banner inside Dashboard */}
+                <div className="bg-white/[0.02] border border-white/5 p-6 md:p-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-2xl md:text-3xl font-serif text-white tracking-tight font-bold">Executive Dashboard</h2>
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-[#C5A059] font-bold mt-1">
+                      System Operational Overview & High-Level Personnel Analytics
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <Button 
+                      onClick={() => {
+                        setActiveTab('REGISTRY');
+                        setShowForm(true);
+                      }}
+                      className="bg-[#C5A059] hover:bg-[#B48F48] text-black rounded-none h-9 px-4 gap-1.5 text-[10px] uppercase tracking-widest font-bold"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> Initialize Register
+                    </Button>
+                    <Button 
+                      onClick={() => setActiveTab('REGISTRY')}
+                      variant="outline"
+                      className="bg-white/5 border-white/10 hover:bg-white/10 text-white rounded-none h-9 px-4 gap-1.5 text-[10px] uppercase tracking-widest font-bold"
+                    >
+                      <Users className="w-3.5 h-3.5 text-[#C5A059]" /> View Full Registry
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Key Metrics / Stat Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                   <StatCard label="Total Personnel" value={employees.length.toString()} sub="Verified Records" />
                   <StatCard label="Active Status" value={employees.filter(e => e.status === 'active').length.toString()} sub="On-Site" />
-                  <StatCard label="Administrative" value={employees.filter(e => e.designation === 'Admin').length.toString()} sub="System Access" />
-                  <StatCard label="Alert Status" value={employees.filter(e => e.status === 'on-leave' || e.status === 'resigned').length.toString()} sub="Attention Required" color="text-red-400" />
+                  <StatCard label="On Leave" value={employees.filter(e => e.status === 'on-leave').length.toString()} sub="Active Leaves" color="text-amber-400" />
+                  <StatCard label="Resigned" value={employees.filter(e => e.status === 'resigned').length.toString()} sub="Past Personnel" color="text-red-400" />
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="bg-white/[0.02] border border-white/5 p-8 rounded-none">
-                    <h3 className="text-white/40 text-[10px] uppercase tracking-[0.3em] font-bold mb-6">Security Node Status</h3>
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center p-4 bg-white/5 border border-white/5">
-                        <div className="flex items-center gap-4">
-                          <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                          <span className="text-xs font-bold tracking-widest uppercase">Database Connectivity</span>
-                        </div>
-                        <span className="text-[10px] text-white/40">OPTIMAL</span>
+                {/* Recent Personnel Overview & Quick Actions */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                  {/* Recent Staff Activity List (2 cols) */}
+                  <div className="lg:col-span-2 bg-white/[0.02] border border-white/5 p-6 md:p-8 space-y-5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="text-base font-serif text-white font-bold">Recent Registered Staff</h3>
+                        <p className="text-[10px] uppercase tracking-widest text-white/40 mt-0.5">Latest 5 Personnel Entries</p>
                       </div>
-                      <div className="flex justify-between items-center p-4 bg-white/5 border border-white/5">
-                        <div className="flex items-center gap-4">
-                          <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
-                          <span className="text-xs font-bold tracking-widest uppercase">Encryption Shield</span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setActiveTab('REGISTRY')}
+                        className="text-[10px] uppercase tracking-widest text-[#C5A059] hover:bg-[#C5A059]/10 rounded-none h-8 px-3"
+                      >
+                        All ({employees.length}) &rarr;
+                      </Button>
+                    </div>
+
+                    <div className="space-y-2.5">
+                      {employees.slice(0, 5).map((emp) => (
+                        <div 
+                          key={emp.id || emp.employeeId}
+                          onClick={() => setSelectedEmployee(emp)}
+                          className="flex items-center justify-between p-3.5 bg-white/5 border border-white/5 hover:border-[#C5A059]/30 hover:bg-white/[0.07] transition-all cursor-pointer group"
+                        >
+                          <div className="flex items-center gap-3.5 min-w-0">
+                            <img 
+                              src={emp.photoUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(emp.name)}`} 
+                              alt={emp.name} 
+                              className="w-10 h-10 object-cover border border-white/10 flex-shrink-0"
+                            />
+                            <div className="min-w-0">
+                              <p className="text-xs font-serif font-bold text-white/90 group-hover:text-[#C5A059] transition-colors truncate">{emp.name}</p>
+                              <p className="text-[10px] text-white/40 font-mono uppercase tracking-wider">{emp.designation} &bull; ID: {emp.employeeId}</p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-3 flex-shrink-0">
+                            <span className={`w-2 h-2 rounded-full ${
+                              emp.status === 'active' 
+                                ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.4)]' 
+                                : emp.status === 'resigned' 
+                                ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.4)]' 
+                                : 'bg-amber-500'
+                            }`} />
+                            <span className="text-[9px] uppercase tracking-widest text-white/40 font-bold hidden sm:inline">{emp.status}</span>
+                          </div>
                         </div>
-                        <span className="text-[10px] text-white/40">ACTIVE - AES256</span>
-                      </div>
+                      ))}
+
+                      {employees.length === 0 && (
+                        <div className="p-8 text-center text-white/20 italic text-xs">
+                          No personnel registered yet.
+                        </div>
+                      )}
                     </div>
                   </div>
 
-                  <div className="bg-white/[0.02] border border-white/5 p-8 rounded-none">
-                    <h3 className="text-white/40 text-[10px] uppercase tracking-[0.3em] font-bold mb-6">Data Operations</h3>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                       <Button 
+                  {/* Security & System Connectivity (1 col) */}
+                  <div className="space-y-6">
+                    <div className="bg-white/[0.02] border border-white/5 p-6 md:p-8 space-y-4">
+                      <h3 className="text-white/40 text-[10px] uppercase tracking-[0.3em] font-bold">System Nodes</h3>
+                      <div className="space-y-3">
+                        <div className="flex justify-between items-center p-3.5 bg-white/5 border border-white/5">
+                          <div className="flex items-center gap-3">
+                            <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
+                            <span className="text-[11px] font-bold tracking-wider uppercase">Database Sync</span>
+                          </div>
+                          <span className="text-[9px] text-white/40 font-mono">ONLINE</span>
+                        </div>
+                        <div className="flex justify-between items-center p-3.5 bg-white/5 border border-white/5">
+                          <div className="flex items-center gap-3">
+                            <div className="w-2 h-2 bg-emerald-500 rounded-full"></div>
+                            <span className="text-[11px] font-bold tracking-wider uppercase">Storage Vault</span>
+                          </div>
+                          <span className="text-[9px] text-white/40 font-mono">SECURE</span>
+                        </div>
+                        <div className="flex justify-between items-center p-3.5 bg-white/5 border border-white/5">
+                          <div className="flex items-center gap-3">
+                            <div className="w-2 h-2 bg-[#C5A059] rounded-full"></div>
+                            <span className="text-[11px] font-bold tracking-wider uppercase">Drive Link</span>
+                          </div>
+                          <span className="text-[9px] text-white/40 font-mono">READY</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="bg-white/[0.02] border border-white/5 p-6 md:p-8 space-y-4">
+                      <h3 className="text-white/40 text-[10px] uppercase tracking-[0.3em] font-bold">Quick Operations</h3>
+                      <div className="grid grid-cols-1 gap-2.5">
+                        <Button 
                           onClick={handleExport}
-                          className="w-full justify-center gap-3 bg-[#C5A059]/10 border border-[#C5A059]/20 rounded-none text-[#C5A059] hover:bg-[#C5A059]/20 h-14 text-[10px] tracking-widest font-bold"
-                       >
-                          <Download className="w-4 h-4" /> EXPORT EXCEL
-                       </Button>
-                       <div className="relative">
-                          <Button 
-                              className="w-full justify-center gap-3 bg-white/5 border border-white/10 rounded-none text-white/60 hover:text-white hover:bg-white/10 h-14 text-[10px] tracking-widest font-bold"
-                          >
-                              <Upload className="w-4 h-4" /> IMPORT EXCEL
-                          </Button>
-                          <input type="file" accept=".xlsx, .xls" onChange={handleImport} className="absolute inset-0 opacity-0 cursor-pointer" />
-                       </div>
+                          className="w-full justify-start gap-2 bg-white/5 border border-white/10 rounded-none text-white hover:bg-white/10 h-10 text-[10px] tracking-widest font-bold uppercase"
+                        >
+                          <Download className="w-3.5 h-3.5 text-[#C5A059]" /> Export Personnel Excel
+                        </Button>
+                        <Button 
+                          onClick={() => setActiveTab('DRIVE')}
+                          className="w-full justify-start gap-2 bg-white/5 border border-white/10 rounded-none text-white hover:bg-white/10 h-10 text-[10px] tracking-widest font-bold uppercase"
+                        >
+                          <HardDrive className="w-3.5 h-3.5 text-[#C5A059]" /> Open Cloud Backup
+                        </Button>
+                      </div>
                     </div>
-                    <p className="mt-4 text-[9px] text-white/20 uppercase tracking-[0.2em] italic font-medium">
-                      Note: Export action encapsulates current verified registry snapshots.
-                    </p>
                   </div>
                 </div>
+              </motion.div>
+            ) : activeTab === 'DRIVE' ? (
+              <motion.div 
+                key="drive"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="space-y-6"
+              >
+                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
+                  <div>
+                    <h2 className="text-3xl font-serif text-white tracking-tight mb-2 font-bold">Google Drive Storage</h2>
+                    <p className="text-[10px] uppercase tracking-[0.2em] text-[#C5A059] font-bold">Manage Registry backups, document attachments & cloud sync</p>
+                  </div>
+                </div>
+                <GoogleDriveManager employees={employees} />
               </motion.div>
             ) : activeTab === 'ALERTS' ? (
               <motion.div 
@@ -466,7 +581,7 @@ export default function App() {
                 className="space-y-6"
               >
                 <div className="p-8 border border-white/5 bg-white/[0.02]">
-                  <h2 className="text-2xl font-serif mb-4">Critical Personnel Alerts</h2>
+                  <h2 className="text-2xl font-serif mb-4 font-bold">Critical Personnel Alerts</h2>
                   <div className="space-y-4">
                     {employees.filter(e => e.status === 'on-leave' || e.status === 'resigned').map(emp => (
                       <div key={emp.id} className="p-4 bg-red-500/5 border border-red-500/10 flex items-center justify-between">
@@ -483,85 +598,92 @@ export default function App() {
                       </div>
                     ))}
                     {employees.filter(e => e.status === 'on-leave' || e.status === 'resigned').length === 0 && (
-                      <p className="text-white/20 text-xs italic">No critical alerts detected in registry.</p>
+                      <div className="p-8 text-center text-white/20 text-xs italic flex flex-col items-center gap-2">
+                        <CheckCircle2 className="w-6 h-6 text-emerald-500/40" />
+                        No critical alerts detected in registry.
+                      </div>
                     )}
                   </div>
                 </div>
               </motion.div>
-            ) : activeTab === 'TERMINAL' ? (
+            ) : (
               <motion.div 
                 key="terminal"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 className="font-mono text-xs text-emerald-500 space-y-4 bg-black p-8 border border-white/10"
               >
-                <p>&gt; System initialized...</p>
+                <p>&gt; RFL Registry System Initialized...</p>
                 <p>&gt; Loading registry nodes...</p>
-                <p>&gt; Found {employees.length} valid signatures.</p>
-                <p>&gt; Terminal RFL secure.</p>
-                <p>&gt; Waiting for input...</p>
-                <div className="pt-8 border-t border-white/10 text-white/40">
+                <p>&gt; Total records found: {employees.length}</p>
+                <p>&gt; Terminal status: READY</p>
+                <div className="pt-8 border-t border-white/10 text-white/40 space-y-1">
                   <p>TERMINAL CONFIGURATION</p>
-                  <p>Region: ASIA-EAST1</p>
-                  <p>Encryption: AES-256-GCM</p>
-                  <p>Auth Status: VERIFIED</p>
+                  <p>Storage: Local Persistent Cache + Supabase Realtime Sync</p>
+                  <p>Drive Integration: Active</p>
+                  <p>Status: OPERATIONAL</p>
                 </div>
-              </motion.div>
-            ) : (
-              <motion.div 
-                key="registry"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="space-y-8"
-              >
-                <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
-                  <div>
-                    <h2 className="text-3xl font-serif text-white tracking-tight mb-2 font-bold">Registry Terminal</h2>
-                    <p className="text-[10px] uppercase tracking-[0.2em] text-[#C5A059] font-bold">Analyzing {filteredEmployees.length} security profiles</p>
-                  </div>
-                  
-                  {/* Mobile searchable input shown on mobile screen width */}
-                  <div className="relative w-full sm:hidden">
-                    <Search className="absolute left-3 top-2.5 w-4 h-4 text-white/20" />
-                    <Input 
-                      placeholder="Scan Registry..." 
-                      className="pl-9 h-10 bg-white/5 border-white/10 rounded-none text-xs w-full focus-visible:ring-[#C5A059]"
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                    />
-                  </div>
-                  
-                  <div className="flex bg-white/5 p-1 border border-white/5">
-                    {['all', 'active', 'on-leave', 'resigned'].map((status) => (
-                      <button
-                        key={status}
-                        onClick={() => setStatusFilter(status)}
-                        className={`px-4 py-1.5 text-[9px] font-bold uppercase tracking-widest transition-all ${
-                          statusFilter === status 
-                          ? 'bg-[#C5A059] text-black shadow-lg shadow-[#C5A059]/20' 
-                          : 'text-white/40 hover:text-white/60'
-                        }`}
-                      >
-                        {status.replace('-', ' ')}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <EmployeeTable 
-                  employees={filteredEmployees}
-                  onEdit={setEditingEmployee}
-                  onDelete={handleDeleteEmployee}
-                  onView={setSelectedEmployee}
-                />
               </motion.div>
             )}
           </AnimatePresence>
         </div>
-
-
       </main>
+
+      {/* Delete In-App Confirmation Modal (Guaranteed to work in iframe) */}
+      <AnimatePresence>
+        {employeeToDelete && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-[#111112] border border-red-500/30 p-6 max-w-md w-full shadow-2xl space-y-5"
+            >
+              <div className="flex items-center gap-3 text-red-400">
+                <div className="p-2.5 bg-red-500/10 rounded-none border border-red-500/20">
+                  <AlertTriangle className="w-6 h-6 text-red-500" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-white tracking-tight">Delete Employee Record</h3>
+                  <p className="text-[10px] uppercase tracking-widest text-red-400/80 font-bold">Irreversible Action</p>
+                </div>
+              </div>
+
+              <div className="p-4 bg-white/5 border border-white/5 space-y-2">
+                <p className="text-xs text-white/80 font-serif font-bold text-base">
+                  {employeeToDelete.name}
+                </p>
+                <div className="flex gap-4 text-[10px] text-white/40 font-mono">
+                  <span>ID: {employeeToDelete.employeeId}</span>
+                  <span>{employeeToDelete.designation}</span>
+                </div>
+              </div>
+
+              <p className="text-xs text-white/60 leading-relaxed">
+                Are you sure you want to permanently delete this employee record from the registry?
+              </p>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <Button
+                  variant="ghost"
+                  onClick={() => setEmployeeToDelete(null)}
+                  disabled={isDeleting}
+                  className="rounded-none text-xs uppercase tracking-wider text-white/60 hover:text-white"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  onClick={handleConfirmDelete}
+                  disabled={isDeleting}
+                  className="bg-red-600 hover:bg-red-700 text-white rounded-none text-xs uppercase tracking-wider font-bold gap-2 px-5"
+                >
+                  <Trash2 className="w-4 h-4" /> {isDeleting ? 'Deleting...' : 'Confirm Delete'}
+                </Button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Mobile Menu */}
       <AnimatePresence>
@@ -583,7 +705,7 @@ export default function App() {
               <div className="flex items-center justify-between mb-12">
                 <div className="flex flex-col">
                   <span className="text-[#C5A059] font-serif italic text-2xl font-bold">RFL</span>
-                  <span className="text-[9px] uppercase tracking-widest text-white/30 font-sans">Terminal Node</span>
+                  <span className="text-[9px] uppercase tracking-widest text-white/30 font-sans">Employee Registry</span>
                 </div>
                 <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(false)} className="text-white/40">
                   <X className="w-5 h-5" />
@@ -609,6 +731,18 @@ export default function App() {
                   active={activeTab === 'REGISTRY'} 
                   onClick={() => { 
                     setActiveTab('REGISTRY'); 
+                    setShowForm(false);
+                    setEditingEmployee(null);
+                    setSelectedEmployee(null);
+                    setIsMobileMenuOpen(false); 
+                  }} 
+                />
+                <SidebarLink 
+                  icon={<HardDrive />} 
+                  label="GOOGLE DRIVE" 
+                  active={activeTab === 'DRIVE'} 
+                  onClick={() => { 
+                    setActiveTab('DRIVE'); 
                     setShowForm(false);
                     setEditingEmployee(null);
                     setSelectedEmployee(null);
@@ -643,21 +777,14 @@ export default function App() {
 
               <div className="mt-8 pt-8 border-t border-white/5 space-y-3">
                  <Button 
-                    onClick={handleExport}
+                    onClick={() => {
+                      handleExport();
+                      setIsMobileMenuOpen(false);
+                    }}
                     className="w-full justify-start gap-3 bg-white/5 border border-white/10 rounded-none text-white/60 hover:text-white hover:bg-white/10 h-10 text-[9px] tracking-widest font-bold"
                  >
-                    <Download className="w-3.5 h-3.5" /> EXPORT
+                    <Download className="w-3.5 h-3.5 text-[#C5A059]" /> EXPORT EXCEL
                  </Button>
-              </div>
-
-              <div className="mt-auto pt-6 border-t border-white/5">
-                <Button 
-                  variant="ghost" 
-                  className="w-full justify-start gap-2 text-white/40 hover:text-white/60 py-4 text-[10px] tracking-widest font-bold"
-                  onClick={handleSignOut}
-                >
-                  <LogOut className="w-4 h-4" /> DISCONNECT
-                </Button>
               </div>
             </motion.div>
           </>

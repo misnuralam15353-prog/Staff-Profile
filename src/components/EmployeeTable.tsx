@@ -13,7 +13,6 @@ import {
   Tooltip, 
   TooltipContent, 
   TooltipTrigger,
-  TooltipProvider
 } from './ui/tooltip';
 import { Employee } from '../types';
 import { EMPLOYEE_STATUS } from '../constants';
@@ -23,7 +22,7 @@ import { cn } from '../lib/utils';
 interface EmployeeTableProps {
   employees: Employee[];
   onEdit: (employee: Employee) => void;
-  onDelete: (id: string) => void;
+  onDelete: (employee: Employee) => void;
   onView: (employee: Employee) => void;
 }
 
@@ -63,7 +62,7 @@ export const EmployeeTable: React.FC<EmployeeTableProps> = ({
               employees.map((employee) => {
                 const status = EMPLOYEE_STATUS.find(s => s.value === employee.status);
                 return (
-                  <TableRow key={employee.id} className="border-white/5 hover:bg-white/[0.02] transition-colors group">
+                  <TableRow key={employee.id || employee.employeeId} className="border-white/5 hover:bg-white/[0.02] transition-colors group">
                     <TableCell>
                       <Avatar className="h-12 w-12 rounded-none border border-white/10 group-hover:scale-105 transition-all duration-500">
                         <AvatarImage src={employee.photoUrl} alt={employee.name} className="object-cover" />
@@ -126,7 +125,7 @@ export const EmployeeTable: React.FC<EmployeeTableProps> = ({
                               buttonVariants({ variant: 'ghost', size: 'icon' }),
                               "h-9 w-9 text-white/20 hover:text-red-500 hover:bg-red-500/10"
                             )}
-                            onClick={() => employee.id && onDelete(employee.id)}
+                            onClick={() => onDelete(employee)}
                           >
                             <Trash2 className="h-4 w-4" />
                           </TooltipTrigger>
@@ -155,7 +154,7 @@ export const EmployeeTable: React.FC<EmployeeTableProps> = ({
             const status = EMPLOYEE_STATUS.find(s => s.value === employee.status);
             return (
               <div 
-                key={employee.id} 
+                key={employee.id || employee.employeeId} 
                 className="bg-white/[0.02] border border-white/5 p-5 space-y-4 relative group"
               >
                 <div className="flex items-center gap-4">
@@ -215,7 +214,7 @@ export const EmployeeTable: React.FC<EmployeeTableProps> = ({
                     variant="ghost" 
                     size="sm" 
                     className="h-8 text-white/40 hover:text-red-500 hover:bg-red-500/10 text-[9px] uppercase tracking-wider gap-1.5 px-3"
-                    onClick={() => employee.id && onDelete(employee.id)}
+                    onClick={() => onDelete(employee)}
                   >
                     <Trash2 className="w-3.5 h-3.5" /> Delete
                   </Button>
@@ -247,7 +246,7 @@ export const EmployeeTable: React.FC<EmployeeTableProps> = ({
               </TableHeader>
               <TableBody>
                 {onLeaveEmployees.map((employee) => (
-                  <TableRow key={employee.id} className="border-white/5 hover:bg-white/[0.02] transition-colors group">
+                  <TableRow key={employee.id || employee.employeeId} className="border-white/5 hover:bg-white/[0.02] transition-colors group">
                     <TableCell className="text-xs text-white/40 font-mono font-bold tracking-tighter">#{employee.employeeId}</TableCell>
                     <TableCell className="text-sm text-white/90 font-serif font-bold">{employee.name}</TableCell>
                     <TableCell className="text-xs text-white/60 italic">{employee.leaveStartDate || '--'}</TableCell>
@@ -266,7 +265,7 @@ export const EmployeeTable: React.FC<EmployeeTableProps> = ({
            {/* Mobile view */}
            <div className="block sm:hidden space-y-3">
              {onLeaveEmployees.map((employee) => (
-               <div key={employee.id} className="bg-white/[0.01] border border-white/5 p-4 space-y-2">
+               <div key={employee.id || employee.employeeId} className="bg-white/[0.01] border border-white/5 p-4 space-y-2">
                  <div className="flex justify-between items-baseline">
                    <h4 className="text-sm font-serif text-white/90 font-bold">{employee.name}</h4>
                    <span className="text-[9px] text-[#C5A059] font-mono tracking-tighter">ID: {employee.employeeId}</span>

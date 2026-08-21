@@ -1,10 +1,11 @@
 {
   "name": "RFL",
-  "description": "Employee profile management system for RFL.",
+  "description": "Employee profile management system for RFL with Supabase and Google Drive integration.",
   "requestFramePermissions": [
     "camera"
   ],
   "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API",
     "Firebase Firestore",
     "Tailwind CSS",
     "Lucide Icons",

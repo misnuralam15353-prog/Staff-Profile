@@ -25,14 +25,14 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
   const [isSignUp, setIsSignUp] = useState(false);
   const [email, setEmail] = useState(ADMIN_EMAIL);
   const [password, setPassword] = useState(ADMIN_PASS);
-  const [fullName, setFullName] = useState('Super Administrator');
+  const [fullName, setFullName] = useState('RFL Registry');
   const [loading, setLoading] = useState(false);
 
   const directAdminLogin = () => {
     const adminUser: AuthUser = {
       id: 'admin-16531mis',
       email: ADMIN_EMAIL,
-      displayName: 'Super Administrator',
+      displayName: 'RFL Registry',
       photoURL: `https://api.dicebear.com/7.x/initials/svg?seed=Admin`,
     };
     try {
@@ -135,7 +135,7 @@ export const Login: React.FC<LoginProps> = ({ onLoginSuccess }) => {
       const fallbackUser: AuthUser = {
         id: `user-${Date.now()}`,
         email: email,
-        displayName: email === ADMIN_EMAIL ? 'Super Administrator' : email.split('@')[0],
+        displayName: email === ADMIN_EMAIL ? 'RFL Registry' : email.split('@')[0],
         photoURL: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(email)}`,
       };
       localStorage.setItem('rfl_active_user', JSON.stringify(fallbackUser));
