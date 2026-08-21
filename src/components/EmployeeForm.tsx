@@ -27,8 +27,10 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ initialData, onSubmi
     guardian1: initialData?.guardian1 || { name: '', relation: '', phone: '' },
     guardian2: initialData?.guardian2 || { name: '', relation: '', phone: '' },
     joiningDate: initialData?.joiningDate || '',
-    leaveStartDate: initialData?.leaveStartDate || '',
-    leaveEndDate: initialData?.leaveEndDate || '',
+    fromAddress: initialData?.fromAddress || initialData?.leaveStartDate || '',
+    departureAddress: initialData?.departureAddress || initialData?.leaveEndDate || '',
+    leaveStartDate: initialData?.fromAddress || initialData?.leaveStartDate || '',
+    leaveEndDate: initialData?.departureAddress || initialData?.leaveEndDate || '',
     nid: initialData?.nid || '',
     photoUrl: initialData?.photoUrl || '',
     status: initialData?.status || 'active',
@@ -285,14 +287,38 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ initialData, onSubmi
             {formData.status === 'on-leave' && (
               <>
                 <div className="space-y-1">
-                  <Label className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Leave Start Date</Label>
-                  <Input name="leaveStartDate" type="date" value={formData.leaveStartDate} onChange={handleChange} 
-                    className="bg-white/5 border-white/10 rounded-none text-xs h-9 focus-visible:ring-[#C5A059] text-white" />
+                  <Label className="text-[10px] uppercase tracking-widest text-[#C5A059] font-bold">From Address</Label>
+                  <Input 
+                    name="fromAddress" 
+                    type="text" 
+                    placeholder="Enter from address / starting location"
+                    value={formData.fromAddress || formData.leaveStartDate || ''} 
+                    onChange={(e) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        fromAddress: e.target.value,
+                        leaveStartDate: e.target.value,
+                      }));
+                    }} 
+                    className="bg-white/5 border-white/10 rounded-none text-xs h-9 focus-visible:ring-[#C5A059] text-white" 
+                  />
                 </div>
                 <div className="space-y-1">
-                  <Label className="text-[10px] uppercase tracking-widest text-white/40 font-bold">Leave End Date</Label>
-                  <Input name="leaveEndDate" type="date" value={formData.leaveEndDate} onChange={handleChange} 
-                    className="bg-white/5 border-white/10 rounded-none text-xs h-9 focus-visible:ring-[#C5A059] text-white" />
+                  <Label className="text-[10px] uppercase tracking-widest text-[#C5A059] font-bold">Departure Address</Label>
+                  <Input 
+                    name="departureAddress" 
+                    type="text" 
+                    placeholder="Enter departure / destination address"
+                    value={formData.departureAddress || formData.leaveEndDate || ''} 
+                    onChange={(e) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        departureAddress: e.target.value,
+                        leaveEndDate: e.target.value,
+                      }));
+                    }} 
+                    className="bg-white/5 border-white/10 rounded-none text-xs h-9 focus-visible:ring-[#C5A059] text-white" 
+                  />
                 </div>
               </>
             )}

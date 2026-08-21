@@ -78,6 +78,10 @@ const INITIAL_EMPLOYEES: Employee[] = [
       phone: '+880 1512-443323'
     },
     joiningDate: '2023-01-10',
+    fromAddress: 'Dhaka Central Warehouse',
+    departureAddress: 'Chattogram Depo',
+    leaveStartDate: 'Dhaka Central Warehouse',
+    leaveEndDate: 'Chattogram Depo',
     nid: '19952692019485723',
     photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
     status: 'on-leave',

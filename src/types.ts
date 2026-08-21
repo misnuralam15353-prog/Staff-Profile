@@ -18,6 +18,8 @@ export interface Employee {
   joiningDate: string;
   leaveStartDate?: string;
   leaveEndDate?: string;
+  fromAddress?: string;
+  departureAddress?: string;
   nid: string;
   photoUrl: string;
   status: 'active' | 'resigned' | 'on-leave';

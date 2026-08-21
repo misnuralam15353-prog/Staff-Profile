@@ -69,8 +69,10 @@ export const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onClos
            <div className="flex items-center gap-4">
               <CalendarDays className="w-8 h-8 text-amber-500" />
               <div>
-                <h4 className="text-amber-500 text-xs font-bold uppercase tracking-widest mb-1">Administrative Leave Status</h4>
-                <p className="text-white/60 text-sm italic">Deployed on leave from <span className="text-white font-bold">{employee.leaveStartDate}</span> until <span className="text-white font-bold">{employee.leaveEndDate}</span></p>
+                <h4 className="text-amber-500 text-xs font-bold uppercase tracking-widest mb-1">Administrative Leave / Movement Status</h4>
+                <p className="text-white/60 text-sm">
+                  From Address: <span className="text-white font-bold">{employee.fromAddress || employee.leaveStartDate || '--'}</span> &bull; Departure Address: <span className="text-white font-bold">{employee.departureAddress || employee.leaveEndDate || '--'}</span>
+                </p>
               </div>
            </div>
            <div className="text-[10px] text-white/20 uppercase tracking-widest font-bold hidden sm:block">

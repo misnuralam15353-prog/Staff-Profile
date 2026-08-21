@@ -232,15 +232,15 @@ export const EmployeeTable: React.FC<EmployeeTableProps> = ({
               <h3 className="text-lg font-serif text-white tracking-tight italic">Leave Status Registry</h3>
            </div>
            
-           {/* Desktop view */}
+            {/* Desktop view */}
            <div className="hidden sm:block bg-white/[0.01] rounded-sm border border-white/5 overflow-hidden">
             <Table>
               <TableHeader className="bg-white/[0.02]">
                 <TableRow className="border-white/5 hover:bg-transparent">
                   <TableHead className="text-[10px] uppercase tracking-widest text-[#C5A059] font-bold">Staff ID</TableHead>
                   <TableHead className="text-[10px] uppercase tracking-widest text-[#C5A059] font-bold">Name</TableHead>
-                  <TableHead className="text-[10px] uppercase tracking-widest text-[#C5A059] font-bold">Start Date</TableHead>
-                  <TableHead className="text-[10px] uppercase tracking-widest text-[#C5A059] font-bold">Return Date</TableHead>
+                  <TableHead className="text-[10px] uppercase tracking-widest text-[#C5A059] font-bold">From Address</TableHead>
+                  <TableHead className="text-[10px] uppercase tracking-widest text-[#C5A059] font-bold">Departure Address</TableHead>
                   <TableHead className="text-[10px] uppercase tracking-widest text-[#C5A059] font-bold">Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -249,8 +249,8 @@ export const EmployeeTable: React.FC<EmployeeTableProps> = ({
                   <TableRow key={employee.id || employee.employeeId} className="border-white/5 hover:bg-white/[0.02] transition-colors group">
                     <TableCell className="text-xs text-white/40 font-mono font-bold tracking-tighter">#{employee.employeeId}</TableCell>
                     <TableCell className="text-sm text-white/90 font-serif font-bold">{employee.name}</TableCell>
-                    <TableCell className="text-xs text-white/60 italic">{employee.leaveStartDate || '--'}</TableCell>
-                    <TableCell className="text-xs text-white/60 italic">{employee.leaveEndDate || '--'}</TableCell>
+                    <TableCell className="text-xs text-white/60 italic">{employee.fromAddress || employee.leaveStartDate || '--'}</TableCell>
+                    <TableCell className="text-xs text-white/60 italic">{employee.departureAddress || employee.leaveEndDate || '--'}</TableCell>
                     <TableCell>
                       <span className="px-2 py-0.5 bg-amber-500/10 text-amber-500 rounded-none text-[9px] font-bold uppercase tracking-widest border border-amber-500/20">
                          On Leave
@@ -272,12 +272,12 @@ export const EmployeeTable: React.FC<EmployeeTableProps> = ({
                  </div>
                  <div className="grid grid-cols-2 gap-2 text-[10px] pt-2 border-t border-white/5">
                    <div>
-                     <span className="text-white/20 block text-[8px] uppercase tracking-wider">Leave Start</span>
-                     <span className="text-white/60 italic">{employee.leaveStartDate || '--'}</span>
+                     <span className="text-white/20 block text-[8px] uppercase tracking-wider">From Address</span>
+                     <span className="text-white/60 italic">{employee.fromAddress || employee.leaveStartDate || '--'}</span>
                    </div>
                    <div>
-                     <span className="text-white/20 block text-[8px] uppercase tracking-wider">Leave Return</span>
-                     <span className="text-white/60 italic">{employee.leaveEndDate || '--'}</span>
+                     <span className="text-white/20 block text-[8px] uppercase tracking-wider">Departure Address</span>
+                     <span className="text-white/60 italic">{employee.departureAddress || employee.leaveEndDate || '--'}</span>
                    </div>
                  </div>
                </div>

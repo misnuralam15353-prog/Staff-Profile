@@ -28,8 +28,8 @@ export const excelService = {
         { header: 'Guardian 2 Phone', key: 'g2phone', width: 15 },
         { header: 'Present Address', key: 'presentAddress', width: 30 },
         { header: 'Permanent Address', key: 'permanentAddress', width: 30 },
-        { header: 'Leave Start', key: 'leaveStart', width: 15 },
-        { header: 'Leave End', key: 'leaveEnd', width: 15 },
+        { header: 'From Address', key: 'fromAddress', width: 25 },
+        { header: 'Departure Address', key: 'departureAddress', width: 25 },
       ];
 
       // Add rows
@@ -53,8 +53,8 @@ export const excelService = {
           g2phone: emp.guardian2.phone,
           presentAddress: emp.presentAddress,
           permanentAddress: emp.permanentAddress,
-          leaveStart: emp.leaveStartDate || '',
-          leaveEnd: emp.leaveEndDate || '',
+          fromAddress: emp.fromAddress || emp.leaveStartDate || '',
+          departureAddress: emp.departureAddress || emp.leaveEndDate || '',
         });
 
         // Set row height to accommodate image
@@ -113,8 +113,8 @@ export const excelService = {
       'Guardian 2 Name': 'Guardian Beta',
       'Guardian 2 Relation': 'Mother',
       'Guardian 2 Phone': '01XXXXXXXXX',
-      'Leave Start': '',
-      'Leave End': '',
+      'From Address': 'Dhaka Head Office',
+      'Departure Address': 'Chattogram Plant',
       'Photo URL': 'https://api.dicebear.com/7.x/avataaars/svg?seed=sample'
     }];
 
@@ -136,31 +136,37 @@ export const excelService = {
         const sheet = workbook.Sheets[sheetName];
         const json = XLSX.utils.sheet_to_json(sheet) as any[];
 
-        const employees = json.map(row => ({
-          employeeId: String(row['Staff ID'] || ''),
-          name: String(row['Full Name'] || ''),
-          designation: String(row['Designation'] || 'Other'),
-          salary: Number(row['Salary (BDT)'] || 0),
-          phone: String(row['Phone'] || ''),
-          joiningDate: String(row['Joining Date'] || ''),
-          nid: String(row['NID Number'] || ''),
-          presentAddress: String(row['Present Address'] || ''),
-          permanentAddress: String(row['Permanent Address'] || ''),
-          status: (row['Status'] || 'active') as any,
-          guardian1: {
-            name: String(row['Guardian 1 Name'] || row['G1 Name'] || ''),
-            relation: String(row['Guardian 1 Relation'] || row['G1 Relation'] || ''),
-            phone: String(row['Guardian 1 Phone'] || row['G1 Phone'] || '')
-          },
-          guardian2: {
-            name: String(row['Guardian 2 Name'] || row['G2 Name'] || ''),
-            relation: String(row['Guardian 2 Relation'] || row['G2 Relation'] || ''),
-            phone: String(row['Guardian 2 Phone'] || row['G2 Phone'] || '')
-          },
-          leaveStartDate: String(row['Leave Start'] || ''),
-          leaveEndDate: String(row['Leave End'] || ''),
-          photoUrl: String(row['Photo URL'] || `https://api.dicebear.com/7.x/avataaars/svg?seed=${Math.random()}`),
-        }));
+        const employees = json.map(row => {
+          const fromAddr = String(row['From Address'] || row['Leave Start'] || '');
+          const depAddr = String(row['Departure Address'] || row['Leave End'] || '');
+          return {
+            employeeId: String(row['Staff ID'] || ''),
+            name: String(row['Full Name'] || ''),
+            designation: String(row['Designation'] || 'Other'),
+            salary: Number(row['Salary (BDT)'] || 0),
+            phone: String(row['Phone'] || ''),
+            joiningDate: String(row['Joining Date'] || ''),
+            nid: String(row['NID Number'] || ''),
+            presentAddress: String(row['Present Address'] || ''),
+            permanentAddress: String(row['Permanent Address'] || ''),
+            status: (row['Status'] || 'active') as any,
+            guardian1: {
+              name: String(row['Guardian 1 Name'] || row['G1 Name'] || ''),
+              relation: String(row['Guardian 1 Relation'] || row['G1 Relation'] || ''),
+              phone: String(row['Guardian 1 Phone'] || row['G1 Phone'] || '')
+            },
+            guardian2: {
+              name: String(row['Guardian 2 Name'] || row['G2 Name'] || ''),
+              relation: String(row['Guardian 2 Relation'] || row['G2 Relation'] || ''),
+              phone: String(row['Guardian 2 Phone'] || row['G2 Phone'] || '')
+            },
+            fromAddress: fromAddr,
+            departureAddress: depAddr,
+            leaveStartDate: fromAddr,
+            leaveEndDate: depAddr,
+            photoUrl: String(row['Photo URL'] || `https://api.dicebear.com/7.x/avataaars/svg?seed=${Math.random()}`),
+          };
+        });
 
         resolve(employees);
       };
