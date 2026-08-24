@@ -64,12 +64,21 @@ export const EmployeeTable: React.FC<EmployeeTableProps> = ({
                 return (
                   <TableRow key={employee.id || employee.employeeId} className="border-white/5 hover:bg-white/[0.02] transition-colors group">
                     <TableCell>
-                      <Avatar className="h-12 w-12 rounded-none border border-white/10 group-hover:scale-105 transition-all duration-500">
-                        <AvatarImage src={employee.photoUrl} alt={employee.name} className="object-cover" />
-                        <AvatarFallback className="bg-white/5 rounded-none">
-                          <User className="h-5 w-5 text-white/20" />
-                        </AvatarFallback>
-                      </Avatar>
+                      <div 
+                        onClick={() => onView(employee)}
+                        className="h-12 w-12 rounded-none border border-white/10 bg-white/5 overflow-hidden flex items-center justify-center cursor-pointer group-hover:border-[#C5A059]/40 transition-all flex-shrink-0"
+                      >
+                        <img 
+                          src={employee.photoUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(employee.name)}&backgroundColor=c5a059,0f172a,1e293b`} 
+                          alt={employee.name} 
+                          referrerPolicy="no-referrer"
+                          loading="lazy"
+                          onError={(e) => {
+                            e.currentTarget.src = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(employee.name)}&backgroundColor=c5a059,0f172a,1e293b`;
+                          }}
+                          className="w-full h-full object-cover group-hover:scale-105 transition-all duration-300" 
+                        />
+                      </div>
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-col">
@@ -158,12 +167,21 @@ export const EmployeeTable: React.FC<EmployeeTableProps> = ({
                 className="bg-white/[0.02] border border-white/5 p-5 space-y-4 relative group"
               >
                 <div className="flex items-center gap-4">
-                  <Avatar className="h-14 w-14 rounded-none border border-white/10">
-                    <AvatarImage src={employee.photoUrl} alt={employee.name} className="object-cover" />
-                    <AvatarFallback className="bg-white/5 rounded-none">
-                      <User className="h-6 w-6 text-white/20" />
-                    </AvatarFallback>
-                  </Avatar>
+                  <div 
+                    onClick={() => onView(employee)}
+                    className="h-14 w-14 rounded-none border border-white/10 bg-white/5 overflow-hidden flex items-center justify-center cursor-pointer flex-shrink-0"
+                  >
+                    <img 
+                      src={employee.photoUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(employee.name)}&backgroundColor=c5a059,0f172a,1e293b`} 
+                      alt={employee.name} 
+                      referrerPolicy="no-referrer"
+                      loading="lazy"
+                      onError={(e) => {
+                        e.currentTarget.src = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(employee.name)}&backgroundColor=c5a059,0f172a,1e293b`;
+                      }}
+                      className="w-full h-full object-cover" 
+                    />
+                  </div>
                   <div className="min-w-0 flex-1">
                     <h4 className="text-base font-serif text-white/90 font-bold truncate">{employee.name}</h4>
                     <p className="text-[10px] text-[#C5A059] uppercase tracking-widest font-mono font-bold">ID: {employee.employeeId}</p>

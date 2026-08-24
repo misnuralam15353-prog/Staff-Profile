@@ -2,8 +2,9 @@ import { supabase } from '../lib/supabase';
 import { Employee } from '../types';
 
 const TABLE_NAME = 'employees';
-const CACHE_KEY = 'rfl_employees_cache_v2';
-const DELETED_IDS_KEY = 'rfl_deleted_employee_ids_v2';
+const CACHE_KEY = 'rfl_employees_cache_v4';
+const DELETED_IDENTIFIERS_KEY = 'rfl_deleted_identifiers_v4';
+const INITIALIZED_FLAG = 'rfl_app_initialized_v4';
 
 const INITIAL_EMPLOYEES: Employee[] = [
   {
@@ -27,7 +28,7 @@ const INITIAL_EMPLOYEES: Employee[] = [
     },
     joiningDate: '2022-03-15',
     nid: '19882692019485721',
-    photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    photoUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
     status: 'active',
     createdAt: Date.now() - 10000000,
     updatedAt: Date.now() - 10000000,
@@ -53,7 +54,7 @@ const INITIAL_EMPLOYEES: Employee[] = [
     },
     joiningDate: '2021-08-01',
     nid: '19922692019485722',
-    photoUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=150&auto=format&fit=crop&q=80',
+    photoUrl: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?w=300&auto=format&fit=crop&q=80',
     status: 'active',
     createdAt: Date.now() - 8000000,
     updatedAt: Date.now() - 8000000,
@@ -83,59 +84,69 @@ const INITIAL_EMPLOYEES: Employee[] = [
     leaveStartDate: 'Dhaka Central Warehouse',
     leaveEndDate: 'Chattogram Depo',
     nid: '19952692019485723',
-    photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&auto=format&fit=crop&q=80',
+    photoUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
     status: 'on-leave',
     createdAt: Date.now() - 5000000,
     updatedAt: Date.now() - 5000000,
   }
 ];
 
-const getDeletedIds = (): Set<string> => {
+const getDeletedIdentifiers = (): Set<string> => {
   try {
-    const raw = localStorage.getItem(DELETED_IDS_KEY);
+    const raw = localStorage.getItem(DELETED_IDENTIFIERS_KEY);
     if (raw) {
       const arr = JSON.parse(raw);
-      if (Array.isArray(arr)) return new Set(arr);
+      if (Array.isArray(arr)) return new Set(arr.map(s => String(s).trim().toLowerCase()));
     }
   } catch (e) {
-    console.warn('Error reading deleted IDs', e);
+    console.warn('Error reading deleted identifiers', e);
   }
   return new Set();
 };
 
-const saveDeletedIds = (ids: Set<string>) => {
+const saveDeletedIdentifiers = (ids: Set<string>) => {
   try {
-    localStorage.setItem(DELETED_IDS_KEY, JSON.stringify(Array.from(ids)));
+    localStorage.setItem(DELETED_IDENTIFIERS_KEY, JSON.stringify(Array.from(ids)));
   } catch (e) {
-    console.warn('Error saving deleted IDs', e);
+    console.warn('Error saving deleted identifiers', e);
   }
 };
 
+const isEmployeeDeleted = (emp: Partial<Employee>, deletedSet: Set<string>): boolean => {
+  if (emp.id && deletedSet.has(String(emp.id).toLowerCase())) return true;
+  if (emp.employeeId && deletedSet.has(String(emp.employeeId).toLowerCase())) return true;
+  return false;
+};
+
 const getLocalCache = (): Employee[] => {
+  const deletedSet = getDeletedIdentifiers();
   try {
+    const isInit = localStorage.getItem(INITIALIZED_FLAG);
     const data = localStorage.getItem(CACHE_KEY);
-    if (data !== null) {
+    
+    if (isInit === 'true' && data !== null) {
       const parsed = JSON.parse(data);
       if (Array.isArray(parsed)) {
-        const deletedIds = getDeletedIds();
-        return parsed.filter(emp => emp?.id && !deletedIds.has(emp.id));
+        return parsed.filter(emp => emp && !isEmployeeDeleted(emp, deletedSet));
       }
     }
   } catch (e) {
     console.warn('Error reading local employee cache', e);
   }
-  // Initialize with INITIAL_EMPLOYEES on first run, excluding any deleted IDs
-  const deletedIds = getDeletedIds();
-  const initList = INITIAL_EMPLOYEES.filter(emp => emp?.id && !deletedIds.has(emp.id));
+
+  // First time initialization only
+  const initList = INITIAL_EMPLOYEES.filter(emp => !isEmployeeDeleted(emp, deletedSet));
+  localStorage.setItem(INITIALIZED_FLAG, 'true');
   setLocalCache(initList);
   return initList;
 };
 
 const setLocalCache = (list: Employee[]) => {
   try {
-    const deletedIds = getDeletedIds();
-    const cleanList = list.filter(emp => emp?.id && !deletedIds.has(emp.id));
+    const deletedSet = getDeletedIdentifiers();
+    const cleanList = list.filter(emp => emp && !isEmployeeDeleted(emp, deletedSet));
     localStorage.setItem(CACHE_KEY, JSON.stringify(cleanList));
+    localStorage.setItem(INITIALIZED_FLAG, 'true');
   } catch (e) {
     console.warn('Error writing local employee cache', e);
   }
@@ -175,23 +186,38 @@ export const employeeService = {
 
   async addEmployee(employee: Omit<Employee, 'id' | 'createdAt' | 'updatedAt'>): Promise<string> {
     const newId = `emp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    
+    // Ensure photoUrl is never blank - use smart initials avatar if not provided
+    const photo = employee.photoUrl?.trim() 
+      ? employee.photoUrl 
+      : `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(employee.name || 'Staff')}&backgroundColor=c5a059,0f172a,1e293b`;
+
     const payload: Employee = {
       ...employee,
+      photoUrl: photo,
       id: newId,
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
 
-    // Remove from deleted IDs if re-added
-    const deletedIds = getDeletedIds();
-    if (deletedIds.has(newId)) {
-      deletedIds.delete(newId);
-      saveDeletedIds(deletedIds);
+    // Remove from deleted identifiers if re-added
+    const deletedSet = getDeletedIdentifiers();
+    let modifiedDeleted = false;
+    if (payload.id && deletedSet.has(payload.id.toLowerCase())) {
+      deletedSet.delete(payload.id.toLowerCase());
+      modifiedDeleted = true;
+    }
+    if (payload.employeeId && deletedSet.has(payload.employeeId.toLowerCase())) {
+      deletedSet.delete(payload.employeeId.toLowerCase());
+      modifiedDeleted = true;
+    }
+    if (modifiedDeleted) {
+      saveDeletedIdentifiers(deletedSet);
     }
 
     // Update local cache immediately
     const current = getLocalCache();
-    const updated = [payload, ...current];
+    const updated = [payload, ...current.filter(e => e.id !== newId && e.employeeId !== payload.employeeId)];
     setLocalCache(updated);
     notifySubscribers();
 
@@ -213,11 +239,23 @@ export const employeeService = {
   },
 
   async updateEmployee(id: string, employee: Partial<Employee>): Promise<void> {
+    // Ensure photoUrl fallback if updated to empty
+    let updatedPhoto = employee.photoUrl;
+    if (updatedPhoto !== undefined && !updatedPhoto.trim() && employee.name) {
+      updatedPhoto = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(employee.name)}&backgroundColor=c5a059,0f172a,1e293b`;
+    }
+
+    const payload = {
+      ...employee,
+      ...(updatedPhoto ? { photoUrl: updatedPhoto } : {}),
+      updatedAt: Date.now(),
+    };
+
     // Update local cache immediately
     const current = getLocalCache();
     const updated = current.map(item => 
-      item.id === id 
-        ? { ...item, ...employee, updatedAt: Date.now() } 
+      item.id === id || (employee.employeeId && item.employeeId === employee.employeeId)
+        ? { ...item, ...payload } 
         : item
     );
     setLocalCache(updated);
@@ -227,10 +265,7 @@ export const employeeService = {
     try {
       const { error } = await supabase
         .from(TABLE_NAME)
-        .update({
-          ...employee,
-          updatedAt: Date.now(),
-        })
+        .update(payload)
         .eq('id', id);
 
       if (error) {
@@ -241,29 +276,32 @@ export const employeeService = {
     }
   },
 
-  async deleteEmployee(id: string): Promise<void> {
-    if (!id) return;
+  async deleteEmployee(id: string, employeeId?: string): Promise<void> {
+    if (!id && !employeeId) return;
 
-    // 1. Record ID in deleted set so remote polling never resurrects it
-    const deletedIds = getDeletedIds();
-    deletedIds.add(id);
-    saveDeletedIds(deletedIds);
+    // 1. Record IDs in deleted set so remote sync never resurrects it
+    const deletedSet = getDeletedIdentifiers();
+    if (id) deletedSet.add(String(id).toLowerCase());
+    if (employeeId) deletedSet.add(String(employeeId).toLowerCase());
+    saveDeletedIdentifiers(deletedSet);
 
     // 2. Remove from local cache immediately
     const current = getLocalCache();
-    const updated = current.filter(item => item.id !== id);
+    const updated = current.filter(item => {
+      if (id && String(item.id).toLowerCase() === String(id).toLowerCase()) return false;
+      if (employeeId && String(item.employeeId).toLowerCase() === String(employeeId).toLowerCase()) return false;
+      return true;
+    });
     setLocalCache(updated);
     notifySubscribers();
 
-    // 3. Delete from Supabase asynchronously
+    // 3. Delete from Supabase asynchronously (by id or employeeId)
     try {
-      const { error } = await supabase
-        .from(TABLE_NAME)
-        .delete()
-        .eq('id', id);
-
-      if (error) {
-        console.warn('Supabase delete warning:', error.message);
+      if (id) {
+        await supabase.from(TABLE_NAME).delete().eq('id', id);
+      }
+      if (employeeId) {
+        await supabase.from(TABLE_NAME).delete().eq('employeeId', employeeId);
       }
     } catch (error) {
       console.warn('Supabase delete error:', error);
@@ -272,7 +310,8 @@ export const employeeService = {
 
   // Reset to initial sample records
   resetToInitialRecords(): void {
-    localStorage.removeItem(DELETED_IDS_KEY);
+    localStorage.removeItem(DELETED_IDENTIFIERS_KEY);
+    localStorage.setItem(INITIALIZED_FLAG, 'true');
     setLocalCache(INITIAL_EMPLOYEES);
     notifySubscribers();
   },
@@ -293,24 +332,33 @@ export const employeeService = {
           .select('*')
           .order('createdAt', { ascending: false });
 
-        if (!error && Array.isArray(data) && data.length > 0) {
-          const deletedIds = getDeletedIds();
+        if (!error && Array.isArray(data)) {
+          const deletedSet = getDeletedIdentifiers();
           const localList = getLocalCache();
-          const localMap = new Map(localList.map(e => [e.id || '', e]));
+          const localMap = new Map(localList.map(e => [e.id || e.employeeId, e]));
 
-          // Remote rows filtered of deleted items
-          const validRemote = (data as Employee[]).filter(emp => emp?.id && !deletedIds.has(emp.id));
+          // Remote rows filtered of all deleted items
+          const validRemote = (data as Employee[]).filter(emp => !isEmployeeDeleted(emp, deletedSet));
 
-          // Merge by taking most recent updatedAt
-          validRemote.forEach(remoteEmp => {
-            if (!remoteEmp.id) return;
-            const existing = localMap.get(remoteEmp.id);
-            if (!existing || (remoteEmp.updatedAt && remoteEmp.updatedAt > existing.updatedAt)) {
-              localMap.set(remoteEmp.id, remoteEmp);
+          // Clean up remote deleted items if they still exist in Supabase
+          const deletedRemote = (data as Employee[]).filter(emp => isEmployeeDeleted(emp, deletedSet));
+          deletedRemote.forEach(delEmp => {
+            if (delEmp.id) {
+              supabase.from(TABLE_NAME).delete().eq('id', delEmp.id).then(() => {});
             }
           });
 
-          const merged = Array.from(localMap.values()).sort((a, b) => b.createdAt - a.createdAt);
+          // Merge by taking most recent updatedAt
+          validRemote.forEach(remoteEmp => {
+            const key = remoteEmp.id || remoteEmp.employeeId;
+            if (!key) return;
+            const existing = localMap.get(key);
+            if (!existing || (remoteEmp.updatedAt && remoteEmp.updatedAt > existing.updatedAt)) {
+              localMap.set(key, remoteEmp);
+            }
+          });
+
+          const merged = Array.from(localMap.values()).sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
           setLocalCache(merged);
           if (active) {
             callback(merged);
@@ -326,7 +374,7 @@ export const employeeService = {
 
     // Realtime channel listener
     const channel = supabase
-      .channel('employees_realtime_channel')
+      .channel('employees_realtime_channel_v4')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: TABLE_NAME },
@@ -336,8 +384,8 @@ export const employeeService = {
       )
       .subscribe();
 
-    // Interval sync backup (every 10s)
-    const intervalId = setInterval(fetchAndSyncRemote, 10000);
+    // Interval sync backup (every 15s)
+    const intervalId = setInterval(fetchAndSyncRemote, 15000);
 
     return () => {
       active = false;
@@ -347,3 +395,4 @@ export const employeeService = {
     };
   }
 };
+

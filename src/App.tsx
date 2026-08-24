@@ -94,13 +94,13 @@ export default function App() {
   };
 
   const handleConfirmDelete = async () => {
-    if (!employeeToDelete?.id) return;
+    if (!employeeToDelete) return;
     const target = employeeToDelete;
     setIsDeleting(true);
     try {
-      await employeeService.deleteEmployee(target.id);
+      await employeeService.deleteEmployee(target.id, target.employeeId);
       setEmployeeToDelete(null);
-      toast.success(`"${target.name}" removed from registry`);
+      toast.success(`"${target.name}" permanently deleted from registry`);
     } catch (error) {
       console.error('Delete error:', error);
       toast.error('Failed to delete employee record');

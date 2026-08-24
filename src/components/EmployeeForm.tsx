@@ -56,6 +56,8 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ initialData, onSubmi
   };
 
   const [uploading, setUploading] = useState(false);
+  const [photoUrlInput, setPhotoUrlInput] = useState('');
+  const [showUrlInput, setShowUrlInput] = useState(false);
 
   const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -66,16 +68,16 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ initialData, onSubmi
       reader.onloadend = () => {
         const img = new Image();
         img.onload = () => {
-          // Create canvas for resizing
+          // Create canvas for resizing to optimal dimensions
           const canvas = document.createElement('canvas');
           const ctx = canvas.getContext('2d');
           
-          // Set target dimensions
-          canvas.width = 300;
-          canvas.height = 300;
+          // Set target dimensions (400x400)
+          canvas.width = 400;
+          canvas.height = 400;
           
           if (ctx) {
-            // Draw image to 300x300 (using cover strategy)
+            // Draw image with aspect cover strategy
             const aspectRatio = img.width / img.height;
             let srcX = 0, srcY = 0, srcWidth = img.width, srcHeight = img.height;
             
@@ -87,29 +89,50 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ initialData, onSubmi
               srcY = (img.height - srcHeight) / 2;
             }
             
-            ctx.drawImage(img, srcX, srcY, srcWidth, srcHeight, 0, 0, 300, 300);
+            ctx.drawImage(img, srcX, srcY, srcWidth, srcHeight, 0, 0, 400, 400);
             
-            // Convert to data URL and set state
+            // Convert to data URL and set state immediately
             const resizedDataUrl = canvas.toDataURL('image/jpeg', 0.85);
-            
-            // Simulate system scan delay for aesthetic
-            setTimeout(() => {
-              setFormData(prev => ({ ...prev, photoUrl: resizedDataUrl }));
-              setUploading(false);
-              toast.success('Biometric scan complete (300x300)');
-            }, 800);
+            setFormData(prev => ({ ...prev, photoUrl: resizedDataUrl }));
+            setUploading(false);
+            toast.success('Photo attached and processed successfully');
           }
         };
+        img.onerror = () => {
+          setUploading(false);
+          toast.error('Failed to parse selected image file');
+        };
         img.src = reader.result as string;
+      };
+      reader.onerror = () => {
+        setUploading(false);
+        toast.error('Could not read image file');
       };
       reader.readAsDataURL(file);
     }
   };
 
+  const handleApplyUrl = () => {
+    if (!photoUrlInput.trim()) {
+      toast.error('Please enter an image URL');
+      return;
+    }
+    setFormData(prev => ({ ...prev, photoUrl: photoUrlInput.trim() }));
+    toast.success('Photo URL applied');
+    setShowUrlInput(false);
+  };
+
+  const handleGenerateAvatar = () => {
+    const nameSeed = formData.name.trim() || formData.employeeId || 'Staff';
+    const avatarUrl = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(nameSeed)}&backgroundColor=c5a059,0f172a,1e293b`;
+    setFormData(prev => ({ ...prev, photoUrl: avatarUrl }));
+    toast.success('Generated avatar assigned to profile');
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Comprehensive validation based on Firestore rules
+    // Comprehensive validation based on required fields
     const fieldMapping: Record<string, string> = {
       employeeId: 'Staff ID',
       name: 'Full Name',
@@ -118,7 +141,6 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ initialData, onSubmi
       joiningDate: 'Joining Date',
       presentAddress: 'Present Address',
       permanentAddress: 'Permanent Address',
-      photoUrl: 'Employee Photo'
     };
 
     const missingFields = Object.entries(fieldMapping)
@@ -131,12 +153,22 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ initialData, onSubmi
     }
 
     if (!formData.guardian1.name || !formData.guardian1.phone) {
-      toast.error('Guardian 1 information is incomplete');
+      toast.error('Guardian 1 information is incomplete (Name and Phone required)');
       return;
     }
 
-    console.log('Form Submit Triggered', formData);
-    onSubmit(formData);
+    // Ensure photoUrl is never blank
+    const finalizedPhoto = formData.photoUrl?.trim() 
+      ? formData.photoUrl 
+      : `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(formData.name)}&backgroundColor=c5a059,0f172a,1e293b`;
+
+    const finalData = {
+      ...formData,
+      photoUrl: finalizedPhoto,
+    };
+
+    console.log('Form Submit Triggered', finalData);
+    onSubmit(finalData);
   };
 
   return (
@@ -179,37 +211,104 @@ export const EmployeeForm: React.FC<EmployeeFormProps> = ({ initialData, onSubmi
         <div className="grid grid-cols-1 md:grid-cols-12 gap-8 items-start">
           
           {/* Photo Section */}
-          <div className="md:col-span-3 flex flex-col items-center gap-4">
+          <div className="md:col-span-3 flex flex-col items-center gap-3">
              <div className="w-full aspect-square bg-white/5 border border-white/10 rounded-none overflow-hidden flex items-center justify-center relative group">
                 {uploading ? (
-                  <div className="flex flex-col items-center gap-3">
+                  <div className="flex flex-col items-center gap-3 p-4 text-center">
                     <div className="w-8 h-8 border-2 border-[#C5A059] border-t-transparent animate-spin"></div>
-                    <span className="text-[9px] uppercase tracking-[0.2em] text-[#C5A059] animate-pulse">Scanning...</span>
+                    <span className="text-[9px] uppercase tracking-[0.2em] text-[#C5A059] animate-pulse">Processing...</span>
                   </div>
                 ) : formData.photoUrl ? (
                   <div className="relative w-full h-full">
-                    <img src={formData.photoUrl} alt="Preview" className="w-full h-full object-cover group-hover:scale-105 transition-all duration-700" />
-                    <div className="absolute top-2 right-2 bg-[#C5A059] text-black px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-widest">Verified</div>
-                    <div className="absolute inset-0 border-2 border-emerald-500/20 pointer-events-none"></div>
+                    <img 
+                      src={formData.photoUrl} 
+                      alt="Preview" 
+                      referrerPolicy="no-referrer"
+                      onError={(e) => {
+                        e.currentTarget.src = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(formData.name || 'Staff')}&backgroundColor=c5a059,0f172a,1e293b`;
+                      }}
+                      className="w-full h-full object-cover transition-all duration-300" 
+                    />
+                    <div className="absolute top-2 right-2 bg-emerald-500 text-black px-1.5 py-0.5 text-[8px] font-bold uppercase tracking-widest">
+                      Photo Loaded
+                    </div>
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center text-white/10">
-                    <Camera className="w-12 h-12 mb-2" />
-                    <span className="text-[10px] uppercase tracking-widest">No Signal</span>
+                  <div className="flex flex-col items-center text-white/20 p-4 text-center">
+                    <Camera className="w-12 h-12 mb-2 text-white/30" />
+                    <span className="text-[10px] uppercase tracking-widest font-bold text-white/40">No Photo Selected</span>
                   </div>
                 )}
-                
-                {!uploading && (
-                  <label className="absolute inset-0 bg-black/80 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center cursor-pointer transition-all duration-300 backdrop-blur-sm">
-                     <Upload className="w-8 h-8 text-[#C5A059] mb-2" />
-                     <span className="text-[10px] font-bold uppercase tracking-widest text-white">{formData.photoUrl ? 'Update Cipher' : 'Upload Portrait'}</span>
-                     <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
-                  </label>
-                )}
              </div>
-             <div className="w-full p-3 bg-white/[0.02] border border-white/5">
-                <p className="text-[9px] text-white/20 uppercase tracking-[0.2em] text-center leading-relaxed font-bold">
-                  Target Acquisition Protocol: Required for secure access identification.
+
+             {/* Action Buttons for Photo */}
+             <div className="w-full space-y-2">
+               <label className="w-full h-9 bg-[#C5A059] hover:bg-[#b58f48] text-black font-bold text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 cursor-pointer transition-colors shadow-sm">
+                 <Upload className="w-3.5 h-3.5" />
+                 <span>{formData.photoUrl ? 'Change Photo' : 'Upload Photo'}</span>
+                 <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
+               </label>
+
+               <div className="grid grid-cols-2 gap-2">
+                 <Button
+                   type="button"
+                   variant="outline"
+                   size="sm"
+                   onClick={() => setShowUrlInput(!showUrlInput)}
+                   className="h-8 bg-white/5 border-white/10 text-white/70 hover:text-white text-[9px] uppercase tracking-wider rounded-none font-bold"
+                 >
+                   Image URL
+                 </Button>
+                 <Button
+                   type="button"
+                   variant="outline"
+                   size="sm"
+                   onClick={handleGenerateAvatar}
+                   className="h-8 bg-white/5 border-white/10 text-white/70 hover:text-[#C5A059] text-[9px] uppercase tracking-wider rounded-none font-bold"
+                 >
+                   Auto Avatar
+                 </Button>
+               </div>
+
+               {showUrlInput && (
+                 <div className="space-y-1.5 p-2.5 bg-white/5 border border-white/10 rounded-none">
+                   <Label className="text-[9px] uppercase tracking-widest text-[#C5A059] font-bold block">Paste Image Link</Label>
+                   <div className="flex gap-1.5">
+                     <Input
+                       type="url"
+                       placeholder="https://..."
+                       value={photoUrlInput}
+                       onChange={(e) => setPhotoUrlInput(e.target.value)}
+                       className="bg-black/50 border-white/10 text-xs h-7 text-white font-mono rounded-none"
+                     />
+                     <Button
+                       type="button"
+                       size="sm"
+                       onClick={handleApplyUrl}
+                       className="h-7 px-2.5 bg-[#C5A059] text-black text-[9px] uppercase font-bold rounded-none"
+                     >
+                       Set
+                     </Button>
+                   </div>
+                 </div>
+               )}
+
+               {formData.photoUrl && (
+                 <Button
+                   type="button"
+                   variant="ghost"
+                   size="sm"
+                   onClick={() => setFormData(prev => ({ ...prev, photoUrl: '' }))}
+                   className="w-full h-7 text-red-400 hover:text-red-300 hover:bg-red-500/10 text-[9px] uppercase tracking-wider rounded-none"
+                 >
+                   Remove Photo
+                 </Button>
+               )}
+             </div>
+
+             <div className="w-full p-2.5 bg-white/[0.02] border border-white/5 text-center">
+                <p className="text-[8px] text-white/30 uppercase tracking-[0.15em] font-bold">
+                  Portrait will be saved securely with the employee profile.
                 </p>
              </div>
           </div>

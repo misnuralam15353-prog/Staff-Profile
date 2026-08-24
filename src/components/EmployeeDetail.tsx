@@ -1,12 +1,12 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Employee } from '../types';
 import { Button } from './ui/button';
 import { 
   X, Phone, MapPin, Calendar, CreditCard, 
   DollarSign, Briefcase, User, Users,
-  ArrowLeft, Download, CalendarDays
+  ArrowLeft, Download, CalendarDays, Maximize2
 } from 'lucide-react';
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { excelService } from '../services/excelService';
 
 interface EmployeeDetailProps {
@@ -15,6 +15,9 @@ interface EmployeeDetailProps {
 }
 
 export const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onClose }) => {
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const photoSrc = employee.photoUrl || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(employee.name)}&backgroundColor=c5a059,0f172a,1e293b`;
+
   const handleExportProfile = async () => {
     await excelService.exportToExcel([employee], `Profile_${employee.employeeId}.xlsx`);
   };
@@ -26,15 +29,67 @@ export const EmployeeDetail: React.FC<EmployeeDetailProps> = ({ employee, onClos
       exit={{ opacity: 0, scale: 0.95 }}
       className="flex flex-col gap-10 bg-transparent"
     >
+      {/* Photo Lightbox Modal */}
+      <AnimatePresence>
+        {showPhotoModal && (
+          <div 
+            onClick={() => setShowPhotoModal(false)}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/90 backdrop-blur-md cursor-zoom-out"
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="relative max-w-lg w-full bg-[#111112] border border-[#C5A059]/40 p-4 shadow-2xl space-y-3"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex justify-between items-center pb-2 border-b border-white/10">
+                <div>
+                  <h4 className="text-sm font-bold text-white uppercase tracking-wider">{employee.name}</h4>
+                  <p className="text-[10px] text-[#C5A059] font-mono uppercase">ID: {employee.employeeId}</p>
+                </div>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => setShowPhotoModal(false)}
+                  className="h-8 w-8 text-white/60 hover:text-white rounded-none"
+                >
+                  <X className="w-5 h-5" />
+                </Button>
+              </div>
+              <div className="w-full aspect-square bg-black/60 overflow-hidden flex items-center justify-center border border-white/5">
+                <img 
+                  src={photoSrc} 
+                  alt={employee.name} 
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    e.currentTarget.src = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(employee.name)}&backgroundColor=c5a059,0f172a,1e293b`;
+                  }}
+                  className="w-full h-full object-contain" 
+                />
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Hero Header */}
       <div className="flex flex-col md:flex-row items-center gap-10 bg-white/[0.02] p-6 md:p-10 border border-white/5 rounded-sm">
-        <div className="relative">
-          <div className="w-32 h-32 md:w-40 md:h-40 bg-white/5 border border-white/10 rounded-none flex items-center justify-center overflow-hidden">
-             {employee.photoUrl ? (
-               <img src={employee.photoUrl} alt={employee.name} className="w-full h-full object-cover transition-all duration-700" />
-             ) : (
-               <User className="w-16 h-16 text-white/5" />
-             )}
+        <div className="relative group cursor-pointer" onClick={() => setShowPhotoModal(true)}>
+          <div className="w-32 h-32 md:w-40 md:h-40 bg-white/5 border border-white/10 rounded-none flex items-center justify-center overflow-hidden relative">
+             <img 
+               src={photoSrc} 
+               alt={employee.name} 
+               referrerPolicy="no-referrer"
+               onError={(e) => {
+                 e.currentTarget.src = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(employee.name)}&backgroundColor=c5a059,0f172a,1e293b`;
+               }}
+               className="w-full h-full object-cover transition-all duration-500 group-hover:scale-105" 
+             />
+             <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex flex-col items-center justify-center transition-opacity">
+               <Maximize2 className="w-6 h-6 text-[#C5A059] mb-1" />
+               <span className="text-[9px] uppercase font-bold tracking-widest text-white">Enlarge</span>
+             </div>
           </div>
           <div className={`absolute -bottom-2 -right-2 w-6 h-6 rounded-none border-4 border-[#0A0A0B] ${employee.status === 'active' ? 'bg-emerald-500 shadow-[0_0_15px_rgba(16,185,129,0.5)]' : employee.status === 'on-leave' ? 'bg-amber-500 shadow-[0_0_15px_rgba(245,158,11,0.5)]' : 'bg-red-500'}`}></div>
         </div>
